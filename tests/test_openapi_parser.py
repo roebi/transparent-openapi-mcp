@@ -116,3 +116,207 @@ async def test_operation_without_request_body_has_none_schema():
 
     wait = next(op for op in operations if op.operation_id == "waitForBatch")
     assert wait.request_body_schema is None
+
+
+SPEC_WITH_REF_REQUEST_BODY = {
+    "openapi": "3.0.0",
+    "info": {"title": "t", "version": "1"},
+    "components": {
+        "schemas": {
+            "ClickRequest": {
+                "type": "object",
+                "properties": {"elementId": {"type": "string"}},
+                "required": ["elementId"],
+            }
+        }
+    },
+    "paths": {
+        "/steps/click": {
+            "post": {
+                "operationId": "clickElement",
+                "requestBody": {
+                    "content": {
+                        "application/json": {"schema": {"$ref": "#/components/schemas/ClickRequest"}}
+                    }
+                },
+            }
+        }
+    },
+}
+
+
+@pytest.mark.asyncio
+async def test_fetch_operations_resolves_ref_in_request_body_schema():
+    def handler(request):
+        return httpx.Response(200, json=SPEC_WITH_REF_REQUEST_BODY)
+
+    async with _client_with_handler(handler) as client:
+        operations = await fetch_operations(client, "https://x/spec.json")
+
+    op = operations[0]
+    assert op.request_body_schema["type"] == "object"
+    assert op.request_body_schema["properties"]["elementId"]["type"] == "string"
+    assert op.request_body_schema["required"] == ["elementId"]
+
+
+SPEC_WITH_REF_PARAMETER_SCHEMA = {
+    "openapi": "3.0.0",
+    "info": {"title": "t", "version": "1"},
+    "components": {"schemas": {"TimeoutSchema": {"type": "integer", "minimum": 0}}},
+    "paths": {
+        "/steps/wait": {
+            "post": {
+                "operationId": "waitForBatch",
+                "parameters": [
+                    {
+                        "name": "timeoutSeconds",
+                        "in": "query",
+                        "required": False,
+                        "schema": {"$ref": "#/components/schemas/TimeoutSchema"},
+                    }
+                ],
+            }
+        }
+    },
+}
+
+
+@pytest.mark.asyncio
+async def test_fetch_operations_resolves_ref_in_parameter_schema():
+    def handler(request):
+        return httpx.Response(200, json=SPEC_WITH_REF_PARAMETER_SCHEMA)
+
+    async with _client_with_handler(handler) as client:
+        operations = await fetch_operations(client, "https://x/spec.json")
+
+    op = operations[0]
+    assert op.parameters[0]["schema"]["type"] == "integer"
+    assert op.parameters[0]["schema"]["minimum"] == 0
+
+
+SPEC_WITH_REF_WHOLE_PARAMETER = {
+    "openapi": "3.0.0",
+    "info": {"title": "t", "version": "1"},
+    "components": {
+        "parameters": {
+            "ElementIdParam": {
+                "name": "elementId",
+                "in": "query",
+                "required": True,
+                "schema": {"type": "string"},
+            }
+        }
+    },
+    "paths": {
+        "/steps/click": {
+            "post": {
+                "operationId": "clickElement",
+                "parameters": [{"$ref": "#/components/parameters/ElementIdParam"}],
+            }
+        }
+    },
+}
+
+
+@pytest.mark.asyncio
+async def test_fetch_operations_resolves_whole_parameter_ref():
+    def handler(request):
+        return httpx.Response(200, json=SPEC_WITH_REF_WHOLE_PARAMETER)
+
+    async with _client_with_handler(handler) as client:
+        operations = await fetch_operations(client, "https://x/spec.json")
+
+    op = operations[0]
+    assert op.parameters[0]["name"] == "elementId"
+    assert op.parameters[0]["required"] is True
+    assert op.parameters[0]["schema"]["type"] == "string"
+
+
+SPEC_WITH_NESTED_REF = {
+    "openapi": "3.0.0",
+    "info": {"title": "t", "version": "1"},
+    "components": {
+        "schemas": {
+            "Coordinates": {
+                "type": "object",
+                "properties": {"x": {"type": "integer"}, "y": {"type": "integer"}},
+            },
+            "ClickRequest": {
+                "type": "object",
+                "properties": {"position": {"$ref": "#/components/schemas/Coordinates"}},
+            },
+        }
+    },
+    "paths": {
+        "/steps/click": {
+            "post": {
+                "operationId": "clickElement",
+                "requestBody": {
+                    "content": {
+                        "application/json": {"schema": {"$ref": "#/components/schemas/ClickRequest"}}
+                    }
+                },
+            }
+        }
+    },
+}
+
+
+@pytest.mark.asyncio
+async def test_fetch_operations_resolves_nested_ref_inside_properties():
+    def handler(request):
+        return httpx.Response(200, json=SPEC_WITH_NESTED_REF)
+
+    async with _client_with_handler(handler) as client:
+        operations = await fetch_operations(client, "https://x/spec.json")
+
+    op = operations[0]
+    position_schema = op.request_body_schema["properties"]["position"]
+    assert position_schema["type"] == "object"
+    assert position_schema["properties"]["x"]["type"] == "integer"
+
+
+SPEC_WITH_CIRCULAR_REF = {
+    "openapi": "3.0.0",
+    "info": {"title": "t", "version": "1"},
+    "components": {
+        "schemas": {
+            "TreeNode": {
+                "type": "object",
+                "properties": {
+                    "label": {"type": "string"},
+                    "children": {"type": "array", "items": {"$ref": "#/components/schemas/TreeNode"}},
+                },
+            }
+        }
+    },
+    "paths": {
+        "/steps/tree": {
+            "post": {
+                "operationId": "setTree",
+                "requestBody": {
+                    "content": {
+                        "application/json": {"schema": {"$ref": "#/components/schemas/TreeNode"}}
+                    }
+                },
+            }
+        }
+    },
+}
+
+
+@pytest.mark.asyncio
+async def test_fetch_operations_handles_circular_ref_without_hanging():
+    def handler(request):
+        return httpx.Response(200, json=SPEC_WITH_CIRCULAR_REF)
+
+    async with _client_with_handler(handler) as client:
+        operations = await fetch_operations(client, "https://x/spec.json")
+
+    op = operations[0]
+    assert op.request_body_schema["type"] == "object"
+    assert op.request_body_schema["properties"]["label"]["type"] == "string"
+    children_items = op.request_body_schema["properties"]["children"]["items"]
+    # The cycle back to TreeNode is left as an unresolved $ref rather
+    # than expanded infinitely.
+    assert "$ref" in children_items

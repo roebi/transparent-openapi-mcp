@@ -5,11 +5,18 @@ found in a spec. This module is the pure-parsing half of that -
 tool_builder.py turns the Operation objects produced here into MCP
 Tool definitions.
 
-Deliberately minimal: only the fields tool_builder.py and
-forwarder.py need (path, method, operationId, parameters,
-requestBody schema) are extracted. No OpenAPI features beyond what
-the first production spec (~150 POST operations) uses are handled
-yet - extend when a real spec needs more (e.g. $ref resolution).
+Local ($ref: "#/...") references are resolved and inlined, since a
+real-world spec commonly factors shared schemas/parameters into
+components/*. Resolution covers: whole-parameter refs
+(components/parameters/*), parameter/request-body schema refs
+(components/schemas/*), and refs nested inside a schema's properties/
+items/allOf/anyOf/oneOf. Circular refs are detected and left as an
+unresolved {"$ref": ...} at the point of recursion, rather than
+expanded infinitely - the resulting schema is still valid JSON Schema
+(a $ref pointing back to itself), just not further inlined.
+
+External ($ref to another file/URL) references are out of scope -
+not needed for the first production spec.
 """
 from __future__ import annotations
 
@@ -54,22 +61,34 @@ def _extract_operations(spec: dict[str, Any]) -> list[Operation]:
         for method, operation_obj in path_item.items():
             if method.lower() not in _HTTP_METHODS:
                 continue
-            operations.append(_build_operation(path, method, operation_obj))
+            operations.append(_build_operation(spec, path, method, operation_obj))
     return operations
 
 
-def _build_operation(path: str, method: str, operation_obj: dict[str, Any]) -> Operation:
+def _build_operation(spec: dict[str, Any], path: str, method: str, operation_obj: dict[str, Any]) -> Operation:
     return Operation(
         operation_id=operation_obj["operationId"],
         path=path,
         method=method.lower(),
         summary=operation_obj.get("summary"),
-        parameters=operation_obj.get("parameters", []),
-        request_body_schema=_extract_request_body_schema(operation_obj),
+        parameters=_resolve_parameters(spec, operation_obj.get("parameters", [])),
+        request_body_schema=_extract_request_body_schema(spec, operation_obj),
     )
 
 
-def _extract_request_body_schema(operation_obj: dict[str, Any]) -> dict[str, Any] | None:
+def _resolve_parameters(spec: dict[str, Any], parameters: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    resolved: list[dict[str, Any]] = []
+    for param in parameters:
+        if "$ref" in param:
+            param = _resolve_ref(spec, param["$ref"])
+        param = dict(param)
+        if "schema" in param:
+            param["schema"] = _resolve_schema(spec, param["schema"])
+        resolved.append(param)
+    return resolved
+
+
+def _extract_request_body_schema(spec: dict[str, Any], operation_obj: dict[str, Any]) -> dict[str, Any] | None:
     request_body = operation_obj.get("requestBody")
     if request_body is None:
         return None
@@ -77,4 +96,50 @@ def _extract_request_body_schema(operation_obj: dict[str, Any]) -> dict[str, Any
     json_content = content.get("application/json")
     if json_content is None:
         return None
-    return json_content.get("schema")
+    schema = json_content.get("schema")
+    if schema is None:
+        return None
+    return _resolve_schema(spec, schema)
+
+
+def _resolve_ref(spec: dict[str, Any], ref: str) -> dict[str, Any]:
+    """Resolve a local JSON pointer ref like '#/components/schemas/X'."""
+    if not ref.startswith("#/"):
+        raise ValueError(f"only local refs are supported, got: {ref}")
+    node: Any = spec
+    for segment in ref[2:].split("/"):
+        node = node[segment]
+    return node
+
+
+def _resolve_schema(
+    spec: dict[str, Any], schema: dict[str, Any], seen_refs: frozenset[str] = frozenset()
+) -> dict[str, Any]:
+    """Recursively inline every local $ref within schema.
+
+    seen_refs tracks the chain of refs currently being expanded, so a
+    cycle (a ref that points back to one already being expanded)
+    stops recursion and leaves that occurrence as an unresolved
+    {"$ref": ...} instead of looping forever.
+    """
+    if "$ref" in schema:
+        ref = schema["$ref"]
+        if ref in seen_refs:
+            return {"$ref": ref}
+        target = _resolve_ref(spec, ref)
+        return _resolve_schema(spec, target, seen_refs | {ref})
+
+    resolved = dict(schema)
+
+    if "properties" in resolved:
+        resolved["properties"] = {
+            name: _resolve_schema(spec, prop_schema, seen_refs)
+            for name, prop_schema in resolved["properties"].items()
+        }
+    if "items" in resolved:
+        resolved["items"] = _resolve_schema(spec, resolved["items"], seen_refs)
+    for keyword in ("allOf", "anyOf", "oneOf"):
+        if keyword in resolved:
+            resolved[keyword] = [_resolve_schema(spec, sub, seen_refs) for sub in resolved[keyword]]
+
+    return resolved
