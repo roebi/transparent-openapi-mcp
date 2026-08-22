@@ -1,2 +1,3 @@
-def main() -> None:
-    print("Hello from transparent-openapi-mcp!")
+from transparent_openapi_mcp.__main__ import main
+
+__all__ = ["main"]
