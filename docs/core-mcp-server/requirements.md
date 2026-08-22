@@ -78,11 +78,14 @@ R-DEPLOY-004. The container has outbound network access at runtime -
 
 ## CFG - configuration model
 
-R-CFG-001. A "config" is a named bundle consisting of:
-    - one or more OpenAPI spec source URLs, each with its own
-      tool-name prefix (see R-TOOLS-003)
-    - one or more backend target base URLs that operations from that
-      config are forwarded to (see R-FWD-001)
+R-CFG-001. A "config" is a named bundle of one or more spec entries.
+    Each spec entry pairs exactly:
+    - one OpenAPI spec source URL, with its own tool-name prefix
+      (see R-TOOLS-003)
+    - one backend target base URL that operations from that spec are
+      forwarded to (see R-FWD-001)
+    A config with multiple spec entries may therefore forward to
+    multiple different backends, one per spec.
 
 R-CFG-002. More than one named config MAY be defined and available for
     selection at any time (a config list).
@@ -124,7 +127,7 @@ R-BOOT-002. If a config is pre-selected, the server validates it
     (R-BOOT-004) and, on success, builds the tool list (R-TOOLS-001)
     before accepting any tool-call request.
 
-R-R-BOOT-003. If no config is pre-selected, the server starts in an
+R-BOOT-003. If no config is pre-selected, the server starts in an
     unconfigured state, exposing only the listConfig and selectConfig
     tools until a valid config is chosen.
 
@@ -166,10 +169,10 @@ R-TOOLS-003. Each spec source's operations are namespaced in the tool
 ## FWD - request forwarding
 
 R-FWD-001. When an OpenAPI-derived tool is called, the server forwards
-    the call as an HTTP request to the currently selected config's
-    backend base URL, using the path/method/params/body defined by
-    that operation in its source spec, and returns the backend's
-    response back through MCP.
+    the call as an HTTP request to the backend base URL paired with
+    that tool's source spec entry (R-CFG-001), using the path/method/
+    params/body defined by that operation in its source spec, and
+    returns the backend's response back through MCP.
 
 R-FWD-002. The server applies a request timeout when forwarding a
     call, resolved in this order: the spec URL entry's own timeout
