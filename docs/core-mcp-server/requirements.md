@@ -28,9 +28,10 @@ model, not by server logic.
 Group prefixes, in requirement-priority order (general control first,
 then deployment/invocation, then configuration, then startup-phase
 behavior, then tool mapping, then request forwarding, then the tech
-stack used to build the server itself). New requirements are added to
-their matching group with the next free number; new groups get a new
-short prefix appended to this list.
+stack used to build the server itself, then how it's released/
+published). New requirements are added to their matching group with
+the next free number; new groups get a new short prefix appended to
+this list.
 
 - CTRL  - general server/process control
 - DEPLOY - how the server process is packaged and invoked (Podman)
@@ -39,6 +40,7 @@ short prefix appended to this list.
 - TOOLS - OpenAPI-spec-to-MCP-tool mapping
 - FWD   - request forwarding to the backend
 - STACK - tech stack / development process for the server itself
+- RELEASE - source repo location, PyPI packaging/publishing, CI release workflow
 
 ## CTRL - general server/process control
 
@@ -54,7 +56,10 @@ R-CTRL-002. Concurrent sessions on the same host never interfere with
 
 R-DEPLOY-001. The server is packaged as a container image, built from
     a Dockerfile with an entrypoint.sh, and named/tagged
-    transparent-openapi-mcp.
+    transparent-openapi-mcp. The Dockerfile installs the
+    transparent-openapi-mcp Python package (R-RELEASE-002) and the
+    entrypoint runs it - the container is a runtime wrapper around the
+    published package, not a separately maintained copy of the code.
 
 R-DEPLOY-002. The local Claude MCP configuration invokes the server by
     running the container as the stdio subprocess (e.g. `podman run -i
@@ -203,6 +208,26 @@ R-STACK-005. The project targets the newest stable Python release
     line (currently 3.14.x - confirm exact patch version at
     implementation time, since patch releases ship regularly). Not
     an older LTS-style version.
+
+## RELEASE - source repo, PyPI packaging, CI release workflow
+
+R-RELEASE-001. The project's source of truth lives at
+    github.com/roebi/transparent-openapi-mcp (public GitHub repo,
+    matching this local git history).
+
+R-RELEASE-002. The project builds and publishes a Python package
+    named transparent-openapi-mcp to public PyPI, matching the
+    existing pattern used by Roebi's other packages (e.g.
+    skill-openapi-bridge, apiup).
+
+R-RELEASE-003. Source code lives in a standard Python package folder
+    layout (src/transparent_openapi_mcp/), matching R-STACK-004's
+    tooling (uv build/publish).
+
+R-RELEASE-004. Publishing follows the standing tag convention: a
+    vX.Y.Z software version tag (distinct from the session-lifecycle
+    handover/vN tag namespace) triggers a GitHub Actions workflow that
+    builds and publishes the package to PyPI.
 
 ## Explicit non-goals (v1)
 

@@ -184,6 +184,7 @@ network listener).
 | R-TOOLS | Tool generation |
 | R-FWD | Request forwarding |
 | R-STACK | Deployment (Dockerfile), Module layout (Python/uv/pytest) |
+| R-RELEASE | [OPEN: to be added - GitHub Actions release workflow design] |
 
 ## Open points for review
 
