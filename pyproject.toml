@@ -1,12 +1,16 @@
 [project]
 name = "transparent-openapi-mcp"
 version = "0.1.0"
-description = "Add your description here"
+description = "KISS MCP server that maps OpenAPI v3 specs 1:1 onto MCP tools, transparently to spec changes"
 readme = "README.md"
 authors = [
     { name = "roebi", email = "3611826+roebi@users.noreply.github.com" }
 ]
 requires-python = ">=3.14"
+classifiers = [
+    "Programming Language :: Python :: 3.14",
+    "Operating System :: OS Independent",
+]
 dependencies = [
     "httpx>=0.28.1",
     "mcp[cli]>=2.0.0",
