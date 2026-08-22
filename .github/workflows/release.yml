@@ -1,0 +1,32 @@
+# Release workflow (R-RELEASE-002/004): builds and publishes the
+# transparent-openapi-mcp package to PyPI on a software version tag.
+name: Release
+
+on:
+  push:
+    tags:
+      # Software version releases only.
+      # Handover delivery tags (handover/vN) intentionally excluded
+      # by this positive pattern - they never match vX.Y.Z format.
+      - 'v[0-9]+.[0-9]+.[0-9]+'
+
+jobs:
+  publish:
+    name: Build and publish to PyPI
+    runs-on: ubuntu-latest
+    environment: release
+    permissions:
+      id-token: write  # trusted publishing to PyPI
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v3
+        with:
+          python-version: "3.14"
+      - name: Run tests before publishing
+        run: |
+          uv sync --all-extras --dev
+          uv run pytest -v
+      - name: Build package
+        run: uv build
+      - name: Publish to PyPI
+        run: uv publish

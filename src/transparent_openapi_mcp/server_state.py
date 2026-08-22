@@ -117,7 +117,13 @@ class ServerState:
         if tool_entry is None:
             raise ToolExecutionError(f'unknown tool "{name}"')
         operation, spec_entry = tool_entry
-        assert self._config_list is not None  # is_configured() implies this
+        if self._config_list is None:
+            # Unreachable in practice: is_configured() (checked above)
+            # implies _activate_config() ran, which only happens after
+            # _config_list is set. Raised explicitly rather than via
+            # assert (bandit B101: asserts are stripped under -O, so
+            # they're not a safe invariant boundary).
+            raise ToolExecutionError("internal error: no config list loaded despite configured state")
         timeout_seconds = self._config_list.effective_timeout_seconds(spec_entry)
         response = await forward_call(
             self._client,

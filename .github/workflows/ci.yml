@@ -1,0 +1,76 @@
+# CI workflow (R-STACK-002/003): runs on every push and pull request.
+# Enforces the standing hard gates - tests, ShellCheck, Python SAST
+# (bandit + semgrep), and a Trivy scan of the built container image.
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    name: Tests (pytest)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v3
+        with:
+          python-version: "3.14"
+      - name: Install dependencies
+        run: uv sync --all-extras --dev
+      - name: Run tests
+        run: uv run pytest -v
+
+  shellcheck:
+    name: ShellCheck (entrypoint.sh, podman_build.sh, podman_run.sh)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run ShellCheck
+        run: shellcheck entrypoint.sh podman_build.sh podman_run.sh
+
+  bandit:
+    name: Python SAST (bandit)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v3
+        with:
+          python-version: "3.14"
+      - name: Install bandit
+        run: uv add --dev bandit
+      - name: Run bandit
+        run: uv run bandit -r src/
+
+  semgrep:
+    name: Python SAST (semgrep)
+    runs-on: ubuntu-latest
+    container:
+      image: semgrep/semgrep
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run semgrep
+        run: semgrep ci --config auto
+        env:
+          SEMGREP_APP_TOKEN: ${{ secrets.SEMGREP_APP_TOKEN }}
+
+  container-scan:
+    name: Container scan (Trivy)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Podman
+        run: sudo apt-get update && sudo apt-get install -y podman
+      - name: Build image
+        run: ./podman_build.sh
+        env:
+          IMAGE_NAME: transparent-openapi-mcp
+          IMAGE_TAG: ci
+      - name: Run Trivy vulnerability scanner
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: "transparent-openapi-mcp:ci"
+          exit-code: "1"
+          severity: "CRITICAL,HIGH"
