@@ -113,6 +113,26 @@ async def test_boot_with_preselected_invalid_config_stays_unconfigured_and_retur
 
 
 @pytest.mark.asyncio
+async def test_boot_local_override_takes_precedence_over_config_list_preselected():
+    """R-BOOT-001: the local mounted config file's preselection wins
+    over the remote config-list's own (optional) preselected field."""
+    other_config_list = {
+        "defaultTimeoutSeconds": 60,
+        "preselected": "tide-openapi-prod",
+        "configs": [
+            {"name": "tide-openapi-prod", "specs": [{"prefix": "tide", "specUrl": SPEC_URL, "backendBaseUrl": BACKEND_URL}]},
+            {"name": "other", "specs": [{"prefix": "other", "specUrl": SPEC_URL, "backendBaseUrl": BACKEND_URL}]},
+        ],
+    }
+    async with _make_client(config_list_body=other_config_list) as client:
+        state = ServerState(client, CONFIG_LIST_URL)
+        error = await state.boot(preselected_override="other")
+    assert error is None
+    assert state.is_configured()
+    assert state.list_configs() == ["tide-openapi-prod", "other"]
+
+
+@pytest.mark.asyncio
 async def test_list_tools_unconfigured_only_exposes_control_tools():
     async with _make_client(config_list_body=CONFIG_LIST_NO_PRESELECT) as client:
         state = ServerState(client, CONFIG_LIST_URL)

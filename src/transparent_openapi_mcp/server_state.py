@@ -71,14 +71,19 @@ class ServerState:
     def is_configured(self) -> bool:
         return self._selected_config is not None
 
-    async def boot(self) -> str | None:
+    async def boot(self, preselected_override: str | None = None) -> str | None:
         """R-BOOT-001..003: load the config list; if a config is
-        preselected, attempt to activate it. Returns the R-BOOT-005
-        failure report string if activation fails, else None."""
+        preselected, attempt to activate it. preselected_override, if
+        given, takes precedence over the config list's own
+        `preselected` field - it represents the local mounted config
+        file's choice (R-BOOT-001), which wins over the remote
+        config-list's own default. Returns the R-BOOT-005 failure
+        report string if activation fails, else None."""
         self._config_list = await load_config_list(self._client, self._config_list_url)
-        if self._config_list.preselected is not None:
+        name_to_select = preselected_override or self._config_list.preselected
+        if name_to_select is not None:
             try:
-                await self._select_config(self._config_list.preselected)
+                await self._select_config(name_to_select)
             except ToolExecutionError as exc:
                 return str(exc)
         return None
