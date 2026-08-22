@@ -1,0 +1,27 @@
+[project]
+name = "transparent-openapi-mcp"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+authors = [
+    { name = "roebi", email = "3611826+roebi@users.noreply.github.com" }
+]
+requires-python = ">=3.14"
+dependencies = [
+    "httpx>=0.28.1",
+    "mcp[cli]>=2.0.0",
+    "pydantic>=2.13.4",
+]
+
+[project.scripts]
+transparent-openapi-mcp = "transparent_openapi_mcp:main"
+
+[build-system]
+requires = ["uv_build>=0.11.7,<0.12.0"]
+build-backend = "uv_build"
+
+[dependency-groups]
+dev = [
+    "pytest>=9.1.1",
+    "pytest-asyncio>=1.4.0",
+]
