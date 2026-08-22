@@ -12,7 +12,10 @@ Implements the config schema from architecture.md:
 """
 from __future__ import annotations
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
+from pydantic.alias_generators import to_camel
+
+_CAMEL_CASE_JSON = ConfigDict(alias_generator=to_camel, populate_by_name=True)
 
 
 class SpecEntry(BaseModel):
@@ -22,7 +25,14 @@ class SpecEntry(BaseModel):
     required. timeout_seconds is optional (R-CFG-005) and falls back
     through Config.default_timeout_seconds and
     ConfigList.default_timeout_seconds when absent (R-FWD-002).
+
+    R-CFG-003: JSON keys are camelCase (specUrl, backendBaseUrl,
+    timeoutSeconds), matching Claude Code's MCP config conventions.
+    Python attribute access stays snake_case either way
+    (populate_by_name=True).
     """
+
+    model_config = _CAMEL_CASE_JSON
 
     prefix: str
     spec_url: str
@@ -32,6 +42,8 @@ class SpecEntry(BaseModel):
 
 class Config(BaseModel):
     """A named bundle of one or more spec entries (R-CFG-001/002)."""
+
+    model_config = _CAMEL_CASE_JSON
 
     name: str
     specs: list[SpecEntry] = Field(min_length=1)
@@ -47,6 +59,8 @@ class ConfigList(BaseModel):
     R-BOOT-001: preselected optionally names a Config to select at
     startup.
     """
+
+    model_config = _CAMEL_CASE_JSON
 
     configs: list[Config]
     default_timeout_seconds: int
