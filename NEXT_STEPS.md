@@ -54,7 +54,7 @@ instead (no token needed, slightly less coverage).
 
 Three separate files are involved, and it's easy to miss one:
 
-1. **The local config file** (`local-config.example.json` /
+1. **The local config file** (`examples/local-config.example.json` /
    `real-config.json`) - mounted into the container. Contains only
    `configListUrl` and optionally `preselected`.
 2. **The config list** - fetched *from* `configListUrl` at runtime
@@ -88,7 +88,7 @@ Before trusting this in a real Claude Code session:
 ./podman_build.sh
 ```
 
-Create a real local config file (copy local-config.example.json,
+Create a real local config file (copy examples/local-config.example.json,
 point configListUrl at wherever you host your actual config-list
 JSON, matching the schema in
 src/transparent_openapi_mcp/local_config.py and

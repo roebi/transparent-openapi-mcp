@@ -1,0 +1,15 @@
+{
+  "defaultTimeoutSeconds": 30,
+  "configs": [
+    {
+      "name": "minimal-openapi",
+      "specs": [
+        {
+          "prefix": "min",
+          "specUrl": "http://host.containers.internal:8000/minimal-openapi.example.json",
+          "backendBaseUrl": "http://host.containers.internal:8000"
+        }
+      ]
+    }
+  ]
+}

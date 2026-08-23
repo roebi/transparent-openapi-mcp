@@ -1,0 +1,4 @@
+{
+  "configListUrl": "http://host.containers.internal:8000/config-list.example.json",
+  "preselected": "minimal-openapi"
+}
