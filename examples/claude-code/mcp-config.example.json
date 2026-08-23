@@ -1,0 +1,12 @@
+{
+  "mcpServers": {
+    "transparent-openapi-mcp": {
+      "command": "podman",
+      "args": [
+        "run", "-i", "--rm",
+        "-v", "/absolute/path/to/t-o-m-config/local-config.json:/etc/transparent-openapi-mcp/config.json:ro,Z",
+        "transparent-openapi-mcp:latest"
+      ]
+    }
+  }
+}
