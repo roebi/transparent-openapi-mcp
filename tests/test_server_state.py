@@ -197,6 +197,63 @@ async def test_call_tool_openapi_derived_forwards_and_returns_backend_response()
 
 
 @pytest.mark.asyncio
+async def test_call_tool_openapi_derived_returns_text_for_non_json_backend_response():
+    """A real backend (or a plain file server, as discovered manually
+    testing against python -m http.server) may not return JSON at
+    all - the tool call must not crash, it should fall back to the
+    raw response text."""
+
+    def handler(request):
+        url = str(request.url)
+        if url == CONFIG_LIST_URL:
+            return httpx.Response(200, json=CONFIG_LIST_NO_PRESELECT)
+        if url == SPEC_URL:
+            return httpx.Response(200, json=SIMPLE_OPENAPI_SPEC)
+        if url.startswith(BACKEND_URL):
+            return httpx.Response(200, content=b"<html>not json</html>", headers={"content-type": "text/html"})
+        raise AssertionError(f"unexpected URL: {url}")
+
+    async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
+        state = ServerState(client, CONFIG_LIST_URL)
+        await state.boot()
+        await state.call_tool("selectConfig", {"name": "tide-openapi-prod"})
+        result = await state.call_tool("tide_clickElement", {"elementId": "btn-1"})
+    assert result == "<html>not json</html>"
+
+
+@pytest.mark.asyncio
+async def test_call_tool_openapi_derived_raises_tool_execution_error_when_backend_unreachable():
+    """The backend can go unreachable *after* selectConfig already
+    validated it (e.g. a network blip mid-session) - the tool call
+    must surface a clean ToolExecutionError, not crash."""
+    calls = {"count": 0}
+
+    def handler(request):
+        url = str(request.url)
+        if url == CONFIG_LIST_URL:
+            return httpx.Response(200, json=CONFIG_LIST_NO_PRESELECT)
+        if url == SPEC_URL:
+            return httpx.Response(200, json=SIMPLE_OPENAPI_SPEC)
+        if url.startswith(BACKEND_URL):
+            calls["count"] += 1
+            if calls["count"] == 1:
+                # First hit is validate_config's reachability check
+                # during selectConfig - let it succeed.
+                return httpx.Response(200)
+            # Second hit is the actual tool call - simulate the
+            # backend going down in between.
+            raise httpx.ConnectError("connection refused", request=request)
+        raise AssertionError(f"unexpected URL: {url}")
+
+    async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
+        state = ServerState(client, CONFIG_LIST_URL)
+        await state.boot()
+        await state.call_tool("selectConfig", {"name": "tide-openapi-prod"})
+        with pytest.raises(ToolExecutionError, match="backend request failed"):
+            await state.call_tool("tide_clickElement", {"elementId": "btn-1"})
+
+
+@pytest.mark.asyncio
 async def test_call_tool_unknown_tool_name_raises():
     async with _make_client() as client:
         state = ServerState(client, CONFIG_LIST_URL)

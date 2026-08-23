@@ -125,14 +125,24 @@ class ServerState:
             # they're not a safe invariant boundary).
             raise ToolExecutionError("internal error: no config list loaded despite configured state")
         timeout_seconds = self._config_list.effective_timeout_seconds(spec_entry)
-        response = await forward_call(
-            self._client,
-            operation=operation,
-            entry=spec_entry,
-            timeout_seconds=timeout_seconds,
-            arguments=arguments,
-        )
-        return response.json()
+        try:
+            response = await forward_call(
+                self._client,
+                operation=operation,
+                entry=spec_entry,
+                timeout_seconds=timeout_seconds,
+                arguments=arguments,
+            )
+        except httpx.RequestError as exc:
+            raise ToolExecutionError(f"backend request failed: {exc}") from exc
+
+        try:
+            return response.json()
+        except ValueError:
+            # Not every backend response is JSON (plain text, HTML,
+            # empty body, etc.) - fall back to raw text rather than
+            # crashing the tool call.
+            return response.text
 
     async def _select_config(self, name: str) -> None:
         """R-BOOT-004/005: validate every URL in the named config;
