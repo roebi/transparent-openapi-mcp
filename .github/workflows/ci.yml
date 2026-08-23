@@ -14,8 +14,8 @@ jobs:
     name: Tests (pytest)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: astral-sh/setup-uv@v3
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
         with:
           python-version: "3.14"
       - name: Install dependencies
@@ -27,7 +27,7 @@ jobs:
     name: ShellCheck (entrypoint.sh, podman_build.sh, podman_run.sh)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Run ShellCheck
         run: shellcheck entrypoint.sh podman_build.sh podman_run.sh
 
@@ -35,8 +35,8 @@ jobs:
     name: Python SAST (bandit)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: astral-sh/setup-uv@v3
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
         with:
           python-version: "3.14"
       - name: Install bandit
@@ -50,7 +50,7 @@ jobs:
     container:
       image: semgrep/semgrep
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Run semgrep
         # Public registry rulesets (no semgrep.dev account/token
         # needed) - "semgrep ci" requires login, "semgrep scan" with
@@ -61,7 +61,7 @@ jobs:
     name: Container scan (Trivy)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Install Podman
         run: sudo apt-get update && sudo apt-get install -y podman
       - name: Build image
