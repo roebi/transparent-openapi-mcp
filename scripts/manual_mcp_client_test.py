@@ -23,6 +23,9 @@ Usage (test the actual built container - closer to production; no
 If your config's preselected entry is valid, this calls a tool named
 <prefix>_<operationId> if you pass --call-tool <name> (optionally with
 --tool-args '{"key": "value"}' as JSON).
+
+Note: --spawn is split with shlex, not a shell - "~" and environment
+variables are NOT expanded. Use absolute paths.
 """
 from __future__ import annotations
 

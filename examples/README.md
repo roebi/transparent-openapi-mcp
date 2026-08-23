@@ -116,9 +116,14 @@ From the repo root, in another terminal:
 
 ### 4. Call a tool through the running container
 
+`manual_mcp_client_test.py` spawns `podman` itself (via Python's
+`shlex.split`, not a shell) - so unlike the `cd`/`mkdir` commands
+above, `~` is **not** expanded here. Use the absolute path to your
+`~/t-o-m-config` directory:
+
 ```sh
 uv run python scripts/manual_mcp_client_test.py \
-  --spawn "podman run -i --rm -v ~/t-o-m-config/local-config.json:/etc/transparent-openapi-mcp/config.json:ro,Z transparent-openapi-mcp:latest" \
+  --spawn "podman run -i --rm -v /absolute/path/to/t-o-m-config/local-config.json:/etc/transparent-openapi-mcp/config.json:ro,Z transparent-openapi-mcp:latest" \
   --call-tool min_getRoot
 ```
 
