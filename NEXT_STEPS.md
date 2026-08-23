@@ -1,157 +1,76 @@
 # Next Steps - transparent-openapi-mcp
 
 Instructions for you (Roebi) to take this from local git history to a
-working, published MCP server. Everything the agent could do without
-your credentials/access is done; everything below needs you.
+working, published MCP server.
 
-## 1. Push to GitHub
+## 1. Push to GitHub - DONE
 
-The repo is meant to live at github.com/roebi/transparent-openapi-mcp
-(R-RELEASE-001). Create that repo on GitHub (empty, no README/license
-auto-init - this repo already has both), then:
+Pushed to github.com/roebi/transparent-openapi-mcp.
 
-```sh
-cd transparent-openapi-mcp
-git remote add origin git@github.com:roebi/transparent-openapi-mcp.git
-git push origin main
-git push origin 'refs/tags/handover/*'
-```
+## 2. Set up PyPI trusted publishing - IN PROGRESS
 
-Do NOT run `git push origin --tags` - it pushes both tag namespaces
-at once and could trigger an unintended release later. Keep pushing
-tag namespaces separately, even though no vX.Y.Z tag exists yet.
+Pending publisher registered on PyPI ("Registered a new pending
+publisher to create the project"). Remaining: confirm the GitHub
+`release` environment (created with defaults) matches what PyPI
+expects, and that the first real release tag actually completes the
+registration.
 
-## 2. Set up PyPI trusted publishing
+## 3. Semgrep - DONE (no account needed)
 
-release.yml uses PyPI's trusted publishing (OIDC), not a stored API
-token - no secret to create for PyPI itself. On pypi.org:
+Switched ci.yml to a plain `semgrep scan` with public rulesets
+(`p/python`, `p/security-audit`) - no `SEMGREP_APP_TOKEN`, no
+semgrep.dev account required.
 
-1. Create the project `transparent-openapi-mcp` on PyPI (or let the
-   first trusted-publish create it - check current PyPI docs, this
-   can vary).
-2. Under the project's "Publishing" settings, add a trusted publisher:
-   - Owner: roebi
-   - Repository: transparent-openapi-mcp
-   - Workflow: release.yml
-   - Environment: release
-3. In the GitHub repo settings, create an environment named `release`
-   (Settings -> Environments -> New environment). This matches
-   release.yml's `environment: release` and PyPI's trusted-publisher
-   config above.
+## 4. Test against your real environment - PARTIALLY DONE
 
-## 3. Add the semgrep secret
+Validated end-to-end with the bundled minimal example (see
+`examples/README.md`) - both `podman_build.sh` and `podman_run.sh`
+work, boot succeeds, `min_getRoot` was called through the container
+via `scripts/manual_mcp_client_test.py` and returned a real (if
+unremarkable) HTTP response. Two real bugs were found and fixed along
+the way (SELinux `:Z` mount flag, non-JSON backend response
+handling) - see commit history.
 
-ci.yml's semgrep job reads `SEMGREP_APP_TOKEN`. If you have a
-semgrep.dev account/token, add it under:
-GitHub repo Settings -> Secrets and variables -> Actions -> New
-repository secret, name `SEMGREP_APP_TOKEN`.
+Still not done: testing against the actual tide-openapi spec and
+backend (not available in this environment yet).
 
-If you don't want a semgrep.dev account, tell the agent in a future
-session and it can switch the semgrep job to a local/offline ruleset
-instead (no token needed, slightly less coverage).
+## 5. Wire it into Claude Code - NOT YET DONE
 
-## 4. Test against your real environment
+No Claude Code session available in this environment yet. See
+`examples/claude-code/README.md` for the exact config entry to add
+when you do have one available - it documents the config path
+requirement (absolute, not shell-expanded) up front.
 
-Three separate files are involved, and it's easy to miss one:
+## 6. Real-world validation checklist
 
-1. **The local config file** (`examples/local-config.example.json` /
-   `real-config.json`) - mounted into the container. Contains only
-   `configListUrl` and optionally `preselected`.
-2. **The config list** - fetched *from* `configListUrl` at runtime
-   (not a local file - must be reachable over HTTP). Contains the
-   named `configs`, each with one or more spec entries pairing a
-   `specUrl` with a `backendBaseUrl` (see
-   `src/transparent_openapi_mcp/config_model.py` for the schema).
-3. **The OpenAPI spec(s)** - referenced *from* a config entry's
-   `specUrl` in file #2, also fetched over HTTP.
-
-If `preselected` names a config that file #2 doesn't actually define,
-or `configListUrl` isn't reachable, boot fails and the server stays
-in the unconfigured state (by design - see R-BOOT-003/005).
-
-Every operation in your OpenAPI spec must have an `operationId` - the
-parser uses it to build the tool name and will raise a KeyError if
-it's missing.
-
-For local testing without a real web server, serve the directory
-containing your config-list and spec file(s) with
-`python3 -m http.server 8000`, and use Podman's special hostname
-`host.containers.internal` (not `localhost`) in `configListUrl` /
-`specUrl` / `backendBaseUrl` so the container can reach your host
-machine.
-
-Nothing in this repo has been tested against the actual tide-openapi
-spec or backend - every automated test uses a mocked HTTP transport.
-Before trusting this in a real Claude Code session:
-
-```sh
-./podman_build.sh
-```
-
-Create a real local config file (copy examples/local-config.example.json,
-point configListUrl at wherever you host your actual config-list
-JSON, matching the schema in
-src/transparent_openapi_mcp/local_config.py and
-src/transparent_openapi_mcp/config_model.py):
-
-```sh
-./podman_run.sh /path/to/your/real-config.json
-```
-
-> On SELinux-enforcing hosts (Fedora default), a bind-mounted file is
-> denied read access inside the container unless relabeled - that's
-> why the mount uses the `:Z` flag (private SELinux relabel for this
-> container). If you ever mount manually without going through
-> podman_run.sh and hit `PermissionError: [Errno 13]` on the config
-> file, add `,Z` to the `-v` flag.
-
-This starts the container and waits on stdio - it will not print
-anything by itself (that is correct MCP stdio behavior). To actually
-exercise it, wire it into a Claude Code MCP config as described below,
-or write a small manual MCP client script.
-
-## 5. Wire it into Claude Code
-
-In your Claude Code MCP config (per R-DEPLOY-002 - podman as the
-stdio subprocess):
-
-```json
-{
-  "mcpServers": {
-    "transparent-openapi-mcp": {
-      "command": "podman",
-      "args": [
-        "run", "-i", "--rm",
-        "-v", "/path/to/your/real-config.json:/etc/transparent-openapi-mcp/config.json:ro,Z",
-        "transparent-openapi-mcp:latest"
-      ]
-    }
-  }
-}
-```
-
-Then in a Claude Code session, run `/mcp` and confirm
-transparent-openapi-mcp shows up with its tools (listConfig,
-selectConfig, plus every OpenAPI-derived tool once a config is
-selected).
-
-## 6. First real-world validation checklist
-
+- [x] Tool names look right (`prefix_operationId`) - confirmed
+      `min_getRoot` from the bundled example
+- [x] Called a tool through the MCP protocol and got a real response
+      back (not mocked) - confirmed via `manual_mcp_client_test.py`
+      against both the direct entrypoint and the built container
 - [ ] Confirm your real OpenAPI spec parses without error (watch for
       $ref patterns not yet covered - openapi_parser.py handles local
       refs in request bodies, parameter schemas, and whole-parameter
       refs, including nested and circular refs, but not external refs
       to other files/URLs)
-- [ ] Confirm tool names look right (prefix_operationId) and do not
-      collide across multiple spec sources if you use more than one
-- [ ] Call a known-safe test step through the MCP tool and confirm
-      the response matches calling it directly against tide-openapi
-- [ ] Try a deliberately invalid config (bad URL) via selectConfig and
-      confirm the error report is clear enough to act on
+- [ ] Confirm tool names do not collide across multiple spec sources
+      if you use more than one (not yet tested - the bundled example
+      only has one spec source)
+- [ ] Call a known-safe *real* tide-openapi test step and confirm the
+      response matches calling it directly
+- [x] Try a deliberately invalid config (bad URL) via selectConfig and
+      confirm the error report is clear enough to act on - verified:
+      with no config preselected, only listConfig/selectConfig are
+      exposed; selectConfig against an unreachable spec+backend
+      returns a clear [ERROR] naming both failing URLs, which
+      config-list file to fix, and how to re-run selectConfig once
+      fixed; a subsequent selectConfig against the valid config in
+      the same session succeeds normally
 
 ## 7. First release
 
-Once step 6 passes:
+Once step 6 passes (or once you're comfortable with what's verified
+so far - the remaining unchecked items all need the real backend):
 
 ```sh
 git tag v0.1.0
