@@ -57,7 +57,7 @@ cd ~/t-o-m-config && python3 -m http.server 8000
 ./podman_run.sh ~/t-o-m-config/local-config.json
 ```
 
-See [`examples/README.md`](examples/README.md#try-it-yourself) for
+See [`examples/README.md`](examples/README.md#running-the-bundled-example-in-podman) for
 the full walkthrough, including how to actually call a tool and see
 a result (this just starts the server - it sits silently on stdio,
 which is correct MCP behavior).

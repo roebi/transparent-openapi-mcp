@@ -1,4 +1,10 @@
-# Configuration examples
+# Server Configuration Examples (Podman)
+
+**This server is designed to run in a Podman container - that is the
+only supported run mode.** Every hostname and every command below
+assumes `podman run`; there is no direct/no-container mode documented
+here, since running outside Podman was never the intended deployment
+path.
 
 Three files, matching a proven working setup (this exact combination
 was tested end-to-end via `podman run`):
@@ -7,13 +13,10 @@ was tested end-to-end via `podman run`):
 - `config-list.example.json`
 - `minimal-openapi.example.json`
 
-**Primary run mode is the Podman container** - that's what
-`podman_run.sh`, a real Claude Code MCP config, and these examples
-are built around. All three files below already use
-`host.containers.internal`, Podman's DNS name for reaching services
-on your host machine from inside the container.
+All three already use `host.containers.internal`, Podman's DNS name
+for reaching services on your host machine from inside the container.
 
-## The three-file chain
+## The Three Config Files and How They Link
 
 It's easy to miss one of these - here's how they connect:
 
@@ -69,7 +72,7 @@ It's easy to miss one of these - here's how they connect:
    HTTP. Every operation **must** have an `operationId` - it's
    required to build the tool name.
 
-## Tool naming
+## MCP Tool Naming: `<prefix>_<operationId>`
 
 Every operation in a spec becomes one MCP tool named
 `<prefix>_<operationId>`. In this example: prefix `min` +
@@ -77,7 +80,9 @@ Every operation in a spec becomes one MCP tool named
 spec sources in one config avoid name collisions - give each a
 distinct prefix.
 
-## Try it yourself
+## Running the Bundled Example in Podman
+
+### 1. Set up a config directory
 
 Set up a working directory outside the repo - this mirrors a real
 deployment, where your config lives separately from the source
@@ -92,21 +97,24 @@ mv config-list.example.json config-list.json
 mv minimal-openapi.example.json minimal-openapi.json
 ```
 
-Serve that directory over HTTP (leave this running in its own
-terminal):
+### 2. Serve the config directory over HTTP
+
+Leave this running in its own terminal:
 
 ```sh
 cd ~/t-o-m-config
 python3 -m http.server 8000
 ```
 
-Build the image (from the repo root, in another terminal):
+### 3. Build the image
+
+From the repo root, in another terminal:
 
 ```sh
 ./podman_build.sh
 ```
 
-Call a tool through the running container:
+### 4. Call a tool through the running container
 
 ```sh
 uv run python scripts/manual_mcp_client_test.py \
@@ -123,19 +131,3 @@ For your own real setup: edit the three files in `~/t-o-m-config`
 (or wherever you keep them) with your real spec/backend URLs, keeping
 `host.containers.internal` for anything that needs to reach your host
 machine from inside the container.
-
-## Running directly without a container (not the primary mode)
-
-For quick local iteration on the code itself, you can skip Podman
-entirely and run the entrypoint directly - but then `localhost` /
-`127.0.0.1` replaces `host.containers.internal` everywhere in your
-config files, since there's no container network namespace involved:
-
-```sh
-TRANSPARENT_OPENAPI_MCP_CONFIG=~/t-o-m-config/local-config.json \
-  uv run python -m transparent_openapi_mcp
-```
-
-Mixing the two hostname conventions up produces `ConnectError` /
-`Name or service not known` - keep a container-mode and a direct-mode
-copy of your config files if you need both.
