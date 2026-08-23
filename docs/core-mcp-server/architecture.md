@@ -6,7 +6,7 @@ scope for this revision.
 
 ## Component overview
 
-Claude Code spawns `podman run -i --rm -v <config>:<path>:ro
+Claude Code spawns `podman run -i --rm -v <config>:<path>:ro,Z
 transparent-openapi-mcp` as its single stdio child process (R-CTRL-001,
 R-DEPLOY-001/002). Inside the container, one Python process runs the
 MCP server, which owns three internal stages: a config loader/
@@ -163,7 +163,7 @@ Dockerfile        builds from a pinned newest-stable Python 3.14.x
 entrypoint.sh      exec's `python -m transparent_openapi_mcp`
 podman_build.sh    reentrant: podman build -t transparent-openapi-mcp .
 podman_run.sh      reentrant: podman run -i --rm -v <local config>:
-                   /etc/transparent-openapi-mcp/config.json:ro
+                   /etc/transparent-openapi-mcp/config.json:ro,Z
                    transparent-openapi-mcp   (manual/local testing)
 ```
 

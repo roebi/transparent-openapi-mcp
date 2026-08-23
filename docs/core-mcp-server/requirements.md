@@ -63,7 +63,7 @@ R-DEPLOY-001. The server is packaged as a container image, built from
 
 R-DEPLOY-002. The local Claude MCP configuration invokes the server by
     running the container as the stdio subprocess (e.g. `podman run -i
-    --rm -v <local-config-file>:<container-path>:ro
+    --rm -v <local-config-file>:<container-path>:ro,Z
     transparent-openapi-mcp`), so R-CTRL-001 is satisfied with Podman
     transparently in between - Claude Code only ever sees a single
     child process communicating over stdio. The pre-selected config /

@@ -70,6 +70,13 @@ src/transparent_openapi_mcp/config_model.py):
 ./podman_run.sh /path/to/your/real-config.json
 ```
 
+> On SELinux-enforcing hosts (Fedora default), a bind-mounted file is
+> denied read access inside the container unless relabeled - that's
+> why the mount uses the `:Z` flag (private SELinux relabel for this
+> container). If you ever mount manually without going through
+> podman_run.sh and hit `PermissionError: [Errno 13]` on the config
+> file, add `,Z` to the `-v` flag.
+
 This starts the container and waits on stdio - it will not print
 anything by itself (that is correct MCP stdio behavior). To actually
 exercise it, wire it into a Claude Code MCP config as described below,
@@ -87,7 +94,7 @@ stdio subprocess):
       "command": "podman",
       "args": [
         "run", "-i", "--rm",
-        "-v", "/path/to/your/real-config.json:/etc/transparent-openapi-mcp/config.json:ro",
+        "-v", "/path/to/your/real-config.json:/etc/transparent-openapi-mcp/config.json:ro,Z",
         "transparent-openapi-mcp:latest"
       ]
     }

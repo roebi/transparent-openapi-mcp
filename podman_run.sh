@@ -29,5 +29,5 @@ if [ ! -f "${LOCAL_CONFIG_FILE}" ]; then
 fi
 
 podman run -i --rm \
-  -v "${LOCAL_CONFIG_FILE}:${CONTAINER_CONFIG_PATH}:ro" \
+  -v "${LOCAL_CONFIG_FILE}:${CONTAINER_CONFIG_PATH}:ro,Z" \
   "${IMAGE_NAME}:${IMAGE_TAG}"
