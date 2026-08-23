@@ -52,9 +52,37 @@ instead (no token needed, slightly less coverage).
 
 ## 4. Test against your real environment
 
+Three separate files are involved, and it's easy to miss one:
+
+1. **The local config file** (`local-config.example.json` /
+   `real-config.json`) - mounted into the container. Contains only
+   `configListUrl` and optionally `preselected`.
+2. **The config list** - fetched *from* `configListUrl` at runtime
+   (not a local file - must be reachable over HTTP). Contains the
+   named `configs`, each with one or more spec entries pairing a
+   `specUrl` with a `backendBaseUrl` (see
+   `src/transparent_openapi_mcp/config_model.py` for the schema).
+3. **The OpenAPI spec(s)** - referenced *from* a config entry's
+   `specUrl` in file #2, also fetched over HTTP.
+
+If `preselected` names a config that file #2 doesn't actually define,
+or `configListUrl` isn't reachable, boot fails and the server stays
+in the unconfigured state (by design - see R-BOOT-003/005).
+
+Every operation in your OpenAPI spec must have an `operationId` - the
+parser uses it to build the tool name and will raise a KeyError if
+it's missing.
+
+For local testing without a real web server, serve the directory
+containing your config-list and spec file(s) with
+`python3 -m http.server 8000`, and use Podman's special hostname
+`host.containers.internal` (not `localhost`) in `configListUrl` /
+`specUrl` / `backendBaseUrl` so the container can reach your host
+machine.
+
 Nothing in this repo has been tested against the actual tide-openapi
-spec or backend - every test uses a mocked HTTP transport. Before
-trusting this in a real Claude Code session:
+spec or backend - every automated test uses a mocked HTTP transport.
+Before trusting this in a real Claude Code session:
 
 ```sh
 ./podman_build.sh
