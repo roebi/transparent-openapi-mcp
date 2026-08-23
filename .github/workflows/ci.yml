@@ -69,9 +69,16 @@ jobs:
         env:
           IMAGE_NAME: transparent-openapi-mcp
           IMAGE_TAG: ci
+      - name: Export image to tarball
+        # trivy-action looks for a running Docker/containerd/Podman
+        # socket to query the image by reference - rootless Podman in
+        # CI doesn't expose one by default, so the image (built fine)
+        # can't be found that way. Exporting to a tarball and scanning
+        # that directly sidesteps the daemon lookup entirely.
+        run: podman save -o transparent-openapi-mcp-ci.tar transparent-openapi-mcp:ci
       - name: Run Trivy vulnerability scanner
         uses: aquasecurity/trivy-action@master
         with:
-          image-ref: "transparent-openapi-mcp:ci"
+          input: transparent-openapi-mcp-ci.tar
           exit-code: "1"
           severity: "CRITICAL,HIGH"
