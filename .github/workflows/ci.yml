@@ -82,3 +82,8 @@ jobs:
           input: transparent-openapi-mcp-ci.tar
           exit-code: "1"
           severity: "CRITICAL,HIGH"
+          # Only fail on CVEs with an available fix we haven't applied
+          # yet - upstream-unfixed OS package CVEs (no patched version
+          # exists at all) would otherwise block the gate permanently
+          # with nothing actionable to do about them.
+          ignore-unfixed: true

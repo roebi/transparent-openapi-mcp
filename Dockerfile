@@ -23,7 +23,15 @@ RUN uv build --wheel --out-dir /build/dist
 
 FROM python:3.14-slim AS runtime
 
+# Pull already-patched OS packages - the base image snapshot lags
+# Debian's own security repo by some margin (Trivy CVE scan, R-STACK-003).
+RUN apt-get update && apt-get upgrade -y && rm -rf /var/lib/apt/lists/*
+
 RUN useradd --create-home --shell /usr/sbin/nologin mcp
+
+# The base image's bundled pip/setuptools are also stale (Trivy
+# flags known CVEs in both) - upgrade before installing our wheel.
+RUN pip install --no-cache-dir --upgrade pip setuptools
 
 COPY --from=builder /build/dist/*.whl /tmp/
 RUN pip install --no-cache-dir /tmp/*.whl && rm -rf /tmp/*.whl
