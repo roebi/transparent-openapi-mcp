@@ -16,7 +16,7 @@ FROM python:3.14-slim AS builder
 RUN pip install --no-cache-dir uv
 
 WORKDIR /build
-COPY pyproject.toml uv.lock README.md ./
+COPY pyproject.toml uv.lock README.md LICENSE ./
 COPY src/ src/
 
 RUN uv build --wheel --out-dir /build/dist
