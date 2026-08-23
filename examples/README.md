@@ -1,11 +1,17 @@
 # Configuration examples
 
 Three files, matching a proven working setup (this exact combination
-was tested end-to-end - see `../scripts/manual_mcp_client_test.py`):
+was tested end-to-end via `podman run`):
 
 - `local-config.example.json`
 - `config-list.example.json`
 - `minimal-openapi.example.json`
+
+**Primary run mode is the Podman container** - that's what
+`podman_run.sh`, a real Claude Code MCP config, and these examples
+are built around. All three files below already use
+`host.containers.internal`, Podman's DNS name for reaching services
+on your host machine from inside the container.
 
 ## The three-file chain
 
@@ -18,7 +24,7 @@ It's easy to miss one of these - here's how they connect:
 
    ```json
    {
-     "configListUrl": "http://example/config-list.json",
+     "configListUrl": "http://host.containers.internal:8000/config-list.json",
      "preselected": "my-config-name"
    }
    ```
@@ -42,8 +48,8 @@ It's easy to miss one of these - here's how they connect:
          "specs": [
            {
              "prefix": "min",
-             "specUrl": "http://example/my-openapi-spec.json",
-             "backendBaseUrl": "http://example:8080"
+             "specUrl": "http://host.containers.internal:8000/minimal-openapi.json",
+             "backendBaseUrl": "http://host.containers.internal:8000"
            }
          ]
        }
@@ -71,37 +77,40 @@ Every operation in a spec becomes one MCP tool named
 spec sources in one config avoid name collisions - give each a
 distinct prefix.
 
-## Hostnames: container vs. direct
-
-Whichever host names you put in `configListUrl` / `specUrl` /
-`backendBaseUrl` must be reachable from wherever the server process
-actually runs. These example files use `host.containers.internal`,
-which only resolves *inside* a running Podman container:
-
-| Running as | Use |
-|---|---|
-| `podman run ...` (the container - normal use) | `host.containers.internal` to reach services on your host machine |
-| `uv run python -m transparent_openapi_mcp` directly (no container) | `localhost` / `127.0.0.1` |
-
-Mixing these up produces `ConnectError` / `Name or service not known`
-- the two run modes have different network namespaces, so the same
-hostname doesn't resolve the same way in both.
-
 ## Try it yourself
 
-Serve this folder over HTTP:
+Set up a working directory outside the repo - this mirrors a real
+deployment, where your config lives separately from the source
+checkout:
 
 ```sh
-cd examples
+mkdir -p ~/t-o-m-config
+cp examples/*.example.json ~/t-o-m-config/
+cd ~/t-o-m-config
+mv local-config.example.json local-config.json
+mv config-list.example.json config-list.json
+mv minimal-openapi.example.json minimal-openapi.json
+```
+
+Serve that directory over HTTP (leave this running in its own
+terminal):
+
+```sh
+cd ~/t-o-m-config
 python3 -m http.server 8000
 ```
 
-In another terminal, from the repo root:
+Build the image (from the repo root, in another terminal):
 
 ```sh
 ./podman_build.sh
+```
+
+Call a tool through the running container:
+
+```sh
 uv run python scripts/manual_mcp_client_test.py \
-  --spawn "podman run -i --rm -v $(pwd)/examples/local-config.example.json:/etc/transparent-openapi-mcp/config.json:ro,Z transparent-openapi-mcp:latest" \
+  --spawn "podman run -i --rm -v ~/t-o-m-config/local-config.json:/etc/transparent-openapi-mcp/config.json:ro,Z transparent-openapi-mcp:latest" \
   --call-tool min_getRoot
 ```
 
@@ -110,6 +119,23 @@ a successful (if unremarkable) response from `min_getRoot` - the
 Python http.server's own directory listing, since these examples
 don't point at a real backend.
 
-For your own real setup, copy these three files, replace the spec/
-backend URLs with your real ones, and adjust hostnames per the table
-above.
+For your own real setup: edit the three files in `~/t-o-m-config`
+(or wherever you keep them) with your real spec/backend URLs, keeping
+`host.containers.internal` for anything that needs to reach your host
+machine from inside the container.
+
+## Running directly without a container (not the primary mode)
+
+For quick local iteration on the code itself, you can skip Podman
+entirely and run the entrypoint directly - but then `localhost` /
+`127.0.0.1` replaces `host.containers.internal` everywhere in your
+config files, since there's no container network namespace involved:
+
+```sh
+TRANSPARENT_OPENAPI_MCP_CONFIG=~/t-o-m-config/local-config.json \
+  uv run python -m transparent_openapi_mcp
+```
+
+Mixing the two hostname conventions up produces `ConnectError` /
+`Name or service not known` - keep a container-mode and a direct-mode
+copy of your config files if you need both.

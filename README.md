@@ -14,11 +14,18 @@ and design.
 ```sh
 ./podman_build.sh
 
-# in another terminal, serve the example config/spec files:
-cd examples && python3 -m http.server 8000
+mkdir -p ~/t-o-m-config
+cp examples/*.example.json ~/t-o-m-config/
+cd ~/t-o-m-config
+mv local-config.example.json local-config.json
+mv config-list.example.json config-list.json
+mv minimal-openapi.example.json minimal-openapi.json
+
+# in another terminal, serve that directory:
+cd ~/t-o-m-config && python3 -m http.server 8000
 
 # back in the first terminal:
-./podman_run.sh examples/local-config.example.json
+./podman_run.sh ~/t-o-m-config/local-config.json
 ```
 
 See [`examples/README.md`](examples/README.md#try-it-yourself) for
