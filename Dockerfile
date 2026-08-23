@@ -29,12 +29,22 @@ RUN apt-get update && apt-get upgrade -y && rm -rf /var/lib/apt/lists/*
 
 RUN useradd --create-home --shell /usr/sbin/nologin mcp
 
-# The base image's bundled pip/setuptools are also stale (Trivy
-# flags known CVEs in both) - upgrade before installing our wheel.
+# The base image's bundled pip/setuptools are stale (Trivy flags
+# known CVEs in both) - upgrade before installing our wheel.
 RUN pip install --no-cache-dir --upgrade pip setuptools
 
 COPY --from=builder /build/dist/*.whl /tmp/
 RUN pip install --no-cache-dir /tmp/*.whl && rm -rf /tmp/*.whl
+
+# pip/setuptools/wheel have no runtime value once our package is
+# installed (entrypoint.sh only ever runs `python -m
+# transparent_openapi_mcp`) - strip them, including Python's
+# ensurepip bootstrap bundle. That bundle embeds its own separate,
+# older copies of pip/setuptools (with their own CVEs) that
+# `pip install --upgrade` above never touches, since ensurepip's
+# files are static bootstrap wheels, not managed packages.
+RUN python -m pip uninstall -y pip setuptools wheel \
+    && rm -rf /usr/local/lib/python3.14/ensurepip /root/.cache/pip
 
 COPY entrypoint.sh /usr/local/bin/entrypoint.sh
 RUN chmod +x /usr/local/bin/entrypoint.sh
